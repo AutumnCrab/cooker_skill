@@ -4,9 +4,15 @@
   "version": "1.0.0",
   "description": "Catch the logic that quietly changes when separately built code pieces are merged into one.",
   "author": {
-    "name": "Taehun Choi",
-    "email": "dbwlsqpdlql@gmail.com"
+    "name": "Taehun Choi"
   },
   "license": "MIT",
-  "keywords": ["merge", "refactor", "code-review", "regression"]
+  "keywords": [
+    "merge",
+    "refactor",
+    "code-review",
+    "regression"
+  ],
+  "homepage": "https://github.com/AutumnCrab/cooker_skill",
+  "repository": "https://github.com/AutumnCrab/cooker_skill"
 }

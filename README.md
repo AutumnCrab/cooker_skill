@@ -1,50 +1,62 @@
 # Cooker
 
-**Catch the logic that quietly changes when an AI merges your parallel work.**
+**Merge code that was built separately — without the logic quietly changing on the way in.**
 
-You split a prototype into parts and built them separately — different sessions, different
-people, different AI agents. Then you ask an AI to combine them. The merged file runs, the UI
-looks right, and somewhere in the middle a guard clause is gone, a threshold moved from `0.3`
-to `0.5`, and a `>=` became `>`.
+Ask an AI to combine three prototype parts and you get one file back. It runs. The UI looks
+right. And somewhere in the middle a guard clause is gone, a threshold moved from `0.3` to
+`0.5`, and a `>=` became `>` — because merging is rewriting, and rewriting drifts.
 
 Nothing crashes. That is the problem.
 
-Cooker snapshots the behavior of every function, class, constant and type contract **before**
-the merge, compares it against the merged result, and reports only what actually changed.
-Formatting, comments, quote style and renamed Python locals are filtered out.
+Cooker is the merge. You point it at the pieces, it combines them, and it holds itself
+accountable: every function, class, constant and type contract is recorded before the merge and
+checked against the result afterwards. Anything whose behavior moved comes back to you as a
+question instead of shipping silently.
 
-It is a [Claude Code](https://code.claude.com/docs) plugin, but the script underneath is plain
-Python with no dependencies, so any agent — or any human — can run it.
+```
+> merge ./parser ./scheduler ./ui into ./app.py
+
+Merged into app.py. Three behaviors changed on the way in:
+
+  scheduler.py::retry_delay   backoff constant 0.5 -> 1.0        <- was this intended?
+  parser.py::parse_line       returns an object now, not a dict  <- needed to match the UI
+  ui.py::RETRY_LIMIT          gone, superseded by scheduler's
+
+The other 41 symbols came through unchanged.
+```
+
+You answer, unintended changes get reverted, and only then do you run the code.
+
+It is a [Claude Code](https://code.claude.com/docs) plugin. The verification engine underneath
+is plain Python with no dependencies, so you can also drive it by hand or from another agent.
 
 ---
 
-## When to use it
+## When to reach for it
 
-Cooker is for **combining code that was never a branch of anything**. The pieces evolved
+Cooker is for **combining code that was never a branch of anything**. The pieces grew
 independently, so they duplicate each other, disagree on interfaces, and have to be rewritten
-as they are joined. That rewriting is where behavior silently drifts.
+as they are joined. That is exactly where behavior slips.
 
-**Good fits:**
-
-- *"I had three Claude sessions build the parser, the scheduler and the UI. Merge them."*
-  Each part invented its own config constants. Cooker tells you which ones vanished.
+- *"Three Claude sessions built the parser, the scheduler and the UI. Put them together."*
+  Each part invented its own config constants. Cooker merges them and tells you which ones it
+  had to drop.
 - *"Two teammates prototyped the same screen. Take the best of both."*
-  Both wrote `formatPrice`. One rounds, one truncates. Only one survives the merge — cooker
-  shows you which behavior you just threw away.
-- *"I refactored these five files into one module."*
-  Cooker follows symbols across the reorganization and confirms the other 40 functions are
-  untouched, so you only review the 5 that moved.
-- *"An agent 'cleaned up duplicates' in my codebase."*
-  Diff the before-snapshot against the result and see exactly what "cleanup" meant.
+  Both wrote `formatPrice` — one rounds, one truncates. Only one can survive; cooker makes sure
+  you are the one who decides which.
+- *"Fold these five files into one module."*
+  Cooker follows every symbol across the reorganization, so you review the 5 that genuinely
+  changed instead of re-reading all 45.
+- *"An agent already 'cleaned up the duplicates' — what did it actually do?"*
+  Snapshot the originals, diff the result, and read the answer.
 
-**Not a fit:**
+**Not this:**
 
 - **Git merge conflicts.** Same repo, shared history, conflict markers — use your merge tool.
-  Cooker is for code that has no common ancestor.
-- **Reviewing normal edits.** If you wrote the change deliberately, you already know what
-  changed. Cooker earns its keep when *something else* did the rewriting.
+  Cooker is for code with no common ancestor.
+- **Edits you made yourself.** You already know what you changed.
 - **Languages it cannot read.** Java, Go, C#, CSS produce zero symbols — and cooker says so
-  loudly instead of reporting success.
+  loudly rather than reporting a clean merge.
 
 ---
 
@@ -53,85 +65,74 @@ as they are joined. That rewriting is where behavior silently drifts.
 **As a Claude Code plugin (recommended):**
 
 ```
-/plugin marketplace add ziezo/cooker
+/plugin marketplace add AutumnCrab/cooker_skill
 /plugin install cooker@cooker
 ```
 
 **As a personal skill, without the plugin system:**
 
 ```bash
-git clone https://github.com/ziezo/cooker /tmp/cooker
+git clone https://github.com/AutumnCrab/cooker_skill /tmp/cooker
 cp -r /tmp/cooker/plugins/cooker/skills/cooker ~/.claude/skills/cooker
 ```
 
 Restart Claude Code afterwards — the skill list is cached at startup.
 
-**Standalone, for any other agent or for scripting** — the script has no dependencies:
-
-```bash
-python plugins/cooker/skills/cooker/logic_snapshot.py --help
-```
-
 Python 3.8+, no third-party packages. Developed and tested on Python 3.14 (Windows).
 
 ---
 
-## How you actually use it
+## Using it
 
-### With Claude Code
+### Just ask for the merge
 
-Just ask for the merge. The skill triggers on requests like "combine these", "merge these
-parts", "make this one file", "integrate the two versions".
+The skill triggers on ordinary requests — "combine these", "merge these parts", "make this one
+file", "integrate the two versions", "clean up the duplicates into one".
 
 ```
-merge ./parser ./scheduler ./ui into ./app.py
+merge ./partA ./partB ./partC into ./merged.py
 ```
 
-Claude snapshots the three parts, does the merge, diffs the result, and comes back with
-something like:
+Cooker records the parts, merges them, verifies the result, and reports every behavior that
+moved. Formatting, comments, quote style and renamed Python locals never show up — only real
+changes do.
 
-> Merged into `app.py`. Cooker flagged 3 changes:
-> - `scheduler.py::retry_delay` — backoff constant changed 0.5 → 1.0. **Was this intended?**
-> - `parser.py::parse_line` — now returns an object instead of a dict (needed to match the UI)
-> - `ui.py::RETRY_LIMIT` — disappeared, superseded by scheduler's own limit
+### Steer how it merges
 
-You confirm or reject each one. Anything unintended gets reverted before you ever run the code.
-
-### Telling it *how* to merge
-
-Anything you type after the paths is a merge instruction, and cooker uses it to decide what
-needs your confirmation and what does not:
+Anything after the paths is an instruction, and cooker uses it to decide what needs your
+approval and what does not:
 
 ```
 /cooker ./v1 ./v2 unify on v2's state management, but keep v1's error handling
 ```
 
-Changes that the instruction explains are reported as "changed as instructed" and passed over.
-Only the changes you did *not* ask for come back as questions.
+Changes the instruction explains come back as *"changed as instructed"* and are passed over.
+Only the ones you did not ask for become questions.
 
-### By hand
+### One rule
+
+**Keep the originals.** Cooker writes the merge to a new file and never touches your pieces —
+they are the baseline it checks against. If something else overwrites them, there is nothing
+left to compare.
+
+### Driving it by hand
+
+The engine is a standalone script, useful from other agents, CI, or a shell:
 
 ```bash
 SNAP=plugins/cooker/skills/cooker/logic_snapshot.py
 
-# 1. before you merge anything
-python $SNAP snapshot ./partA ./partB ./partC -o before.json
-
-# 2. merge however you like
-
-# 3. after
-python $SNAP diff before.json ./merged.py
+python $SNAP snapshot ./partA ./partB ./partC -o before.json   # before you merge
+# ... merge however you like ...
+python $SNAP diff before.json ./merged.py                      # after
 ```
-
-One rule: **keep the original pieces.** If the merge overwrites them, there is nothing left to
-compare against.
 
 ---
 
-## Walkthrough
+## What a merge report looks like
 
-`examples/python-log-analyzer/` holds three parts of a log analyzer built separately, plus a
-correct merge and a deliberately damaged one.
+`examples/python-log-analyzer/` holds three parts of a log analyzer built separately, plus the
+merged result.
 
 ```bash
 cd examples/python-log-analyzer
@@ -168,10 +169,13 @@ python $SNAP diff before.json merged.py
 ```
 
 Part 2 was written against dicts while part 1 produces objects, so the merge had to adapt it.
-Cooker points at exactly the five functions that were touched — and stays quiet about the
-twenty-odd that were not.
+Cooker names exactly the five functions it touched — and stays quiet about the twenty-odd it
+carried through untouched.
 
-Now the damaged merge, which runs without errors and prints a plausible report:
+### Proving it catches the bad merge
+
+`merged_broken.py` is the same merge with five subtle bugs planted. It runs fine and prints a
+plausible report:
 
 ```bash
 python $SNAP snapshot merged.py -o good.json
@@ -187,13 +191,13 @@ python $SNAP diff good.json merged_broken.py
 ### merged.py::ALERT_THRESHOLD    <- 0.3 became 0.5
 ```
 
-Five planted bugs, five caught. The function whose comments and blank lines were rewritten is
-not in the list.
+Five planted, five caught. The function whose comments and blank lines were rewritten is not in
+the list.
 
 ### The React example
 
 `examples/react-shop/` is the same story in JSX: a cart part and a checkout part that each
-implemented the money math, with their own tax constant. The merge unified them on part 1.
+implemented the money math with their own tax constant. The merge unified them on part 1.
 
 ```
 ## Changed logic (3)
@@ -205,12 +209,12 @@ implemented the money math, with their own tax constant. The merge unified them 
 - part3_checkout.jsx::VAT_RATE      <- duplicate of TAX_RATE, removed
 ```
 
-The duplicated constant vanishing is the interesting line. It is correct here, and a silent bug
-the next time.
+The duplicated constant vanishing is the line worth reading. It is correct here, and a silent
+bug the next time.
 
 ---
 
-## What it tracks
+## What it watches
 
 | | |
 |---|---|
@@ -220,30 +224,30 @@ the next time.
 | Type contracts | `interface`, `type` aliases, `enum` |
 | HTML | code inside `<script>` |
 
-Symbols are followed across file reorganization (three parts collapsing into one file) and
-across renames, so restructuring alone does not produce noise.
+Symbols are followed across file reorganization (three parts collapsing into one) and across
+renames, so restructuring alone produces no noise.
 
 Supported: `.py` `.js` `.ts` `.jsx` `.tsx` `.html`
 
-## What it does not do
+## What it will not catch
 
 - **JS/TS local renames read as changes.** Python normalizes locals through the AST and is
   immune; JavaScript has no stdlib parser here, so `counts` → `result` is reported.
 - **Equivalent code written differently reads as a change** — f-string vs `.format()`, ternary
   vs if/else. Deliberately not "fixed": teaching the tool to call two different things equal
-  risks hiding a real bug, and a false positive only costs ten seconds of reading.
+  risks hiding a real bug, and a false positive costs ten seconds of reading.
 - **Top-level wiring is reported separately, never counted as a change.** Listener hookups and
   init order always change when files are combined, so counting them would bury the signal.
-  Check that section by eye — broken buttons live there.
+  Read that section by eye — broken buttons live there.
 - Cross-file call relationships are not tracked.
-- It never edits your code. Cooker only reads and prints.
+- The verification engine never edits code. It only reads and prints.
 
 ## Failing loudly
 
 The worst outcome for a tool like this is a confident "all clear" on a check that never ran. A
 typo'd path, an unsupported language, an unreadable file, a corrupt snapshot or swapped
 arguments all print a `!!` line and exit non-zero, and the skill instructions tell the agent
-never to report those as a pass.
+never to report those as a successful merge.
 
 ```
 $ python logic_snapshot.py snapshot ./typoed-path -o before.json
@@ -259,13 +263,13 @@ $ echo $?
 python plugins/cooker/skills/cooker/test_logic_snapshot.py   # 29 asserts, no framework
 ```
 
-Every fix in this repo started as a bug found by running the tool against real merges: a
-destructured React parameter truncating a function body, a URL's `//` swallowing the rest of a
-line, Python's floor-division operator read as a JS comment, look-alike helpers hiding a
-300-symbol regression. Each one has a regression assert.
+Every fix in this repo started as a bug found by merging real code: a destructured React
+parameter truncating a function body, a URL's `//` swallowing the rest of a line, Python's
+floor-division operator read as a JS comment, look-alike helpers hiding a 300-symbol
+regression. Each one left a regression assert behind.
 
-Validated against 15 three-way merge scenarios across HTML, Python, JS, TS, JSX and Node, plus
-a 6000-symbol synthetic project (0.3s).
+Validated on 15 three-way merges across HTML, Python, JS, TS, JSX and Node, plus a
+6000-symbol synthetic project (0.3s).
 
 ## License
 

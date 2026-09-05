@@ -1,7 +1,8 @@
 {
   "name": "cooker",
   "owner": {
-    "name": "Taehun Choi"
+    "name": "AutumnCrab",
+    "url": "https://github.com/AutumnCrab"
   },
   "description": "Cooker - catch logic drift when separately built code is merged together",
   "plugins": [

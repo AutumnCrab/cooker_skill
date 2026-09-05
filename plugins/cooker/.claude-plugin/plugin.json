@@ -4,7 +4,8 @@
   "version": "1.0.0",
   "description": "Catch the logic that quietly changes when separately built code pieces are merged into one.",
   "author": {
-    "name": "Taehun Choi"
+    "name": "AutumnCrab",
+    "url": "https://github.com/AutumnCrab"
   },
   "license": "MIT",
   "keywords": [

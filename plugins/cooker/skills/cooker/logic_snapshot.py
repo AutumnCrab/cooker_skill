@@ -29,9 +29,13 @@ JS_DEFAULT_RE = re.compile(
     r"^export\s+default\s+(?:async\s+)?(?:function\s*\([^)]*\)\s*|\([^)]*\)\s*=>\s*)\{",
     re.MULTILINE,
 )
+# `async function`, `function*` and `abstract class` are ordinary declarations. Missing them
+# means an entire category of code is invisible, and the tool reports a clean merge anyway.
 JS_DEF_RE = re.compile(
-    r"^(?:export\s+)?(?:default\s+)?(?:function|class)\s+(\w+)"
-    r"|^(?:export\s+)?const\s+(\w+)\s*=\s*(?:\(|async|\bfunction\b)",
+    r"^(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s*\*?\s*(\w+)"
+    r"|^(?:export\s+)?(?:default\s+)?(?:abstract\s+)?class\s+(\w+)"
+    # `const f = x => {}` has no parens around the parameter, so match the arrow too
+    r"|^(?:export\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:\(|async|\bfunction\b|\w+\s*=>)",
     re.MULTILINE,
 )
 
@@ -212,7 +216,7 @@ def _extract_js(text):
         out[key] = body
 
     for m in JS_DEF_RE.finditer(text):
-        name = m.group(1) or m.group(2)
+        name = m.group(1) or m.group(2) or m.group(3)
         brace_start = _find_body_brace(text, m.start())
         if brace_start == -1:
             continue
@@ -506,6 +510,30 @@ def _clip(src):
     return "\n".join("  | " + line for line in lines)
 
 
+SCHEMA_VERSION = 1
+
+
+def _wrap_snapshot(symbols):
+    return {"schema_version": SCHEMA_VERSION, "symbols": symbols}
+
+
+def _unwrap_snapshot(data, path):
+    """Accept both the versioned envelope and the original bare mapping."""
+    if "schema_version" not in data:
+        return data  # v0: the file was the symbol mapping itself
+    version = data.get("schema_version")
+    if version != SCHEMA_VERSION:
+        print(f"!! snapshot was written by a different version of this tool: {path}")
+        print(f"   file says schema_version {version}, this build understands {SCHEMA_VERSION}.")
+        print("   Re-run the snapshot command with this build before comparing.")
+        sys.exit(2)
+    symbols = data.get("symbols")
+    if not isinstance(symbols, dict):
+        print(f"!! snapshot is missing its `symbols` object: {path}")
+        sys.exit(2)
+    return symbols
+
+
 def _load_snapshot_json(path, label):
     """Read a snapshot file, reporting common mistakes in plain words instead of a traceback."""
     if os.path.isdir(path):
@@ -526,7 +554,7 @@ def _load_snapshot_json(path, label):
     if not isinstance(data, dict):
         print(f"!! {label} has the wrong shape (not an object): {path}")
         sys.exit(2)
-    return data
+    return _unwrap_snapshot(data, path)
 
 
 def _report_scan_problems(symbol_count):
@@ -577,8 +605,10 @@ def main():
         for root in args.roots:
             snap.update(snapshot(root))
         with open(args.out, "w", encoding="utf-8") as f:
-            json.dump(snap, f, ensure_ascii=False, indent=2)
+            json.dump(_wrap_snapshot(snap), f, ensure_ascii=False, indent=2)
         print(f"[snapshot saved: {args.out}, {len(snap)} symbols]")
+        print("   It contains your source verbatim (function bodies and constants).")
+        print("   Keep it out of version control and delete it when the merge is done.")
         _report_scan_problems(len(snap))
         return sys.exit(2) if len(snap) == 0 else None
 

@@ -109,11 +109,17 @@ approval and what does not:
 Changes the instruction explains come back as *"changed as instructed"* and are passed over.
 Only the ones you did not ask for become questions.
 
-### One rule
+### Two rules
 
 **Keep the originals.** Cooker writes the merge to a new file and never touches your pieces —
 they are the baseline it checks against. If something else overwrites them, there is nothing
 left to compare.
+
+**Treat the snapshot like source code.** `before.json` contains function bodies and constants
+verbatim, so a hardcoded credential in your code is a hardcoded credential in the snapshot.
+Write it to a temp directory, keep it out of version control, and delete it once the merge is
+confirmed. The tool prints this reminder every time it writes one, and the repo's `.gitignore`
+already covers the default names.
 
 ### Driving it by hand
 
@@ -240,6 +246,11 @@ Supported: `.py` `.js` `.ts` `.jsx` `.tsx` `.html`
   init order always change when files are combined, so counting them would bury the signal.
   Read that section by eye — broken buttons live there.
 - Cross-file call relationships are not tracked.
+- **JS/TS is read by pattern matching, not a real parser.** It is exercised by 22 adversarial
+  syntax cases in the test suite — async functions, generators, decorated classes, nested
+  template literals, JSX braces, regexes containing quotes — but a syntax nobody thought of can
+  still slip past. This is the least trustworthy part of the tool; treat Python results as
+  exact and JS/TS results as very good but not proof.
 - The verification engine never edits code. It only reads and prints.
 
 ## Failing loudly
@@ -260,7 +271,7 @@ $ echo $?
 ## Development
 
 ```bash
-python plugins/cooker/skills/cooker/test_logic_snapshot.py   # 29 asserts, no framework
+python plugins/cooker/skills/cooker/test_logic_snapshot.py   # 31 asserts + 22 JS syntax cases
 ```
 
 Every fix in this repo started as a bug found by merging real code: a destructured React

@@ -67,6 +67,13 @@ user cooker cannot run and just do the merge.
 
 Symbols are followed across file reorganization (three parts into one file) and renames.
 
+## The snapshot file holds their source code
+`before.json` stores function bodies and constants **verbatim** — including any secret that is
+hardcoded as a constant. Treat it like the source itself:
+- write it to a temp/scratch directory, never inside the user's repository
+- delete it once the merge is confirmed
+- never commit it, never paste its contents anywhere
+
 ## Keep the original pieces
 **Do not overwrite or delete the original piece files.** Always write the merged result to a
 new file. Without the originals there is nothing to compare against.

@@ -172,6 +172,67 @@ try:
     changed15, _ = diff_snapshots(ord_a, ord_b)
     assert len(changed15) == 1, changed15
 
+    # --- adversarial JS/TS syntax ---------------------------------------------------
+    # The pattern matcher is the weakest part of this tool. Every declaration form below
+    # must produce a symbol whose body is complete; a missed form makes a whole category
+    # of code invisible and lets the tool report a clean merge that is not one.
+    from logic_snapshot import _extract_js_constants, _extract_ts_types
+
+    def extract_all(src):
+        found = _extract_js_constants(src)
+        found.update(_extract_ts_types(src))
+        found.update(_extract_js(src))
+        return found
+
+    js_cases = [
+        ("async function", 'async function load(u) {\n  return u;\n}\n', ["load"]),
+        ("export async function", 'export async function save(x) {\n  return x;\n}\n', ["save"]),
+        ("export default async function",
+         'export default async function Page(p) {\n  return p;\n}\n', ["Page"]),
+        ("generator", 'function* gen() {\n  yield 1;\n}\n', ["gen"]),
+        ("async generator", 'async function* stream() {\n  yield 1;\n}\n', ["stream"]),
+        ("abstract class",
+         'export abstract class Repo {\n  find(id: string) { return id; }\n}\n', ["Repo"]),
+        ("class extends", 'class Child extends Base {\n  run() { return 1; }\n}\n', ["Child"]),
+        ("export default class",
+         'export default class Store {\n  get() { return 1; }\n}\n', ["Store"]),
+        ("arrow without parens", 'const inc = x => {\n  return x + 1;\n};\n', ["inc"]),
+        ("function expression", 'let handler = function (e) {\n  return e;\n};\n', ["handler"]),
+        ("generic function",
+         'export function pick<T>(items: T[]): T {\n  return items[0];\n}\n', ["pick"]),
+        ("template literal braces",
+         'const t = `${a} {x}`;\nfunction after(x) { return x; }\n', ["t", "after"]),
+        ("nested template literal",
+         'function tag(x) {\n  return `a${`b${x}c`}d`;\n}\nfunction after(y){ return y; }\n',
+         ["tag", "after"]),
+        ("class field arrow",
+         'class A {\n  handle = (e) => {\n    return e.type;\n  };\n  run() { return 1; }\n}\n', ["A"]),
+        ("regex with quotes",
+         "const r = /['\"]/g;\nfunction after(x) { return r.test(x); }\n", ["r", "after"]),
+        ("regex with brace",
+         'const r2 = /[{]/g;\nfunction after(x) { return x; }\n', ["r2", "after"]),
+        ("jsx literal brace",
+         "function Cell() {\n  return <span>{'}'}</span>;\n}\nfunction after(){ return 1; }\n",
+         ["Cell", "after"]),
+        ("decorated class",
+         '@Component({\n  selector: "app-root"\n})\nexport class Root {\n  run() { return 1; }\n}\n',
+         ["Root"]),
+        ("getter and setter",
+         'class B {\n  get value() { return this._v; }\n  set value(v) { this._v = v; }\n}\n', ["B"]),
+        ("comment marker inside string",
+         'const s = "http://x.test // not a comment";\nfunction after() { return s; }\n',
+         ["s", "after"]),
+        ("multiline object constant",
+         'const cfg = {\n  a: 1,\n  nested: { b: 2 }\n};\nfunction after() { return cfg; }\n',
+         ["cfg", "after"]),
+    ]
+    for label, source, expected in js_cases:
+        found = extract_all(source)
+        for name in expected:
+            assert name in found, f"{label}: {name} not extracted (got {sorted(found)})"
+        for name, body in found.items():
+            assert body.rstrip().endswith(("}", ";", "]")), f"{label}: {name} body truncated -> {body!r}"
+
     print("OK: all self-checks passed")
 finally:
     shutil.rmtree(tmp, ignore_errors=True)

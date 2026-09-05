@@ -1,0 +1,19 @@
+{
+  "name": "cooker",
+  "owner": {
+    "name": "Taehun Choi",
+    "email": "dbwlsqpdlql@gmail.com"
+  },
+  "description": "Cooker - catch logic drift when separately built code is merged together",
+  "plugins": [
+    {
+      "name": "cooker",
+      "source": "./plugins/cooker",
+      "description": "Snapshots the behavior of every function, class, constant and type contract before a merge, then reports only what actually changed afterwards.",
+      "version": "1.0.0",
+      "license": "MIT",
+      "keywords": ["merge", "refactor", "code-review", "regression"],
+      "category": "productivity"
+    }
+  ]
+}

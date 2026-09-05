@@ -1,0 +1,12 @@
+{
+  "name": "cooker",
+  "displayName": "Cooker",
+  "version": "1.0.0",
+  "description": "Catch the logic that quietly changes when separately built code pieces are merged into one.",
+  "author": {
+    "name": "Taehun Choi",
+    "email": "dbwlsqpdlql@gmail.com"
+  },
+  "license": "MIT",
+  "keywords": ["merge", "refactor", "code-review", "regression"]
+}

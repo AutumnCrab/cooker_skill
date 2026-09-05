@@ -1,7 +1,10 @@
 __pycache__/
 *.pyc
-*.json
-!package.json
 .venv/
 venv/
 .DS_Store
+
+# snapshot files produced while using the tool
+before.json
+after.json
+good.json

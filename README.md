@@ -27,8 +27,12 @@ The other 41 symbols came through unchanged.
 
 You answer, unintended changes get reverted, and only then do you run the code.
 
-It is a [Claude Code](https://code.claude.com/docs) plugin. The verification engine underneath
-is plain Python with no dependencies, so you can also drive it by hand or from another agent.
+It is a [Claude Code](https://code.claude.com/docs) plugin. To be exact about what ships here:
+the merging is done by the agent following the skill's instructions, and the Python in this repo
+is the half that holds it accountable — it records and compares, and never rewrites a line. That
+split is deliberate. The thing doing the rewriting should not also be the thing grading it.
+
+The engine has no dependencies, so you can drive it by hand or from another agent too.
 
 ---
 
